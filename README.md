@@ -1,8 +1,7 @@
 # Squeek or Sleep
 
 A free prediction game on [Squeekchain](https://squeekchain.com). Players guess whether
-Squeektoshi the hamster will be running (Squeek) or asleep (Sleep) when the next 2-minute round
-ends. Rounds are scored from the live wheel telemetry at `https://api.squeekchain.com/v1/status`,
+Squeektoshi the hamster runs (Squeek) or sleeps (Sleep) in the next 2-minute round. Rounds are scored from the live wheel telemetry at `https://api.squeekchain.com/v1/status`,
 polled every 5 seconds. Chain stats come from `https://api.squeekchain.com/v1/economy/state`.
 No wallet, no tokens, no backend: picks, scores and round history live in the browser's
 `localStorage`.
@@ -48,25 +47,55 @@ relative (`./styles.css`, `./app.js`, `./game.js`, `./favicon.svg`, `./og-image.
 - Correctly calling a change (asleep to running, or running to asleep): 3 points. Correctly calling
   no change: 1 point. A wrong pick costs nothing.
 - With no reading at the start or the end (feed down, page closed), the round is void: nobody scores.
-- The state comes from the API's wheel fields. `src/game.js` (`parseStatus`) reads the state from
-  `wheel.status`, `wheel_status`, `state` or `hamster.state` (snake_case or camelCase), or from a
-  `running` boolean, and falls back to `rpm > 0`. "Stopped" counts as Sleep. If the payload has
-  no usable field, the page says so and does not guess.
-- Several people on one device can play under different names ("Change name"). The leaderboard is
-  per browser and says so on the page; static hosting cannot share scores between visitors.
+- The state comes from the live `/v1/status` measurement. `src/game.js` (`parseStatus`) reads
+  `measurement.coreStatus` (`ACTIVE` or `SPINNING` is Squeek, `IDLE` is Sleep), the speed from
+  `measurement.rpmMilli / 1000`, and the block height from `builder.anchor.blockHeight`. A
+  measurement whose `freshness` is not `online`, or whose status is anything else (for example
+  `COUNTER_FAULT`), counts as no reading: the page says so and does not guess. Payloads without a
+  `measurement` object fall back to looser wheel fields (`wheel.status`, a `running` boolean, `rpm > 0`).
+- Chain stats come from `/v1/economy/state` (`parseEconomy`). SQK supply is
+  `supply.liveSupplyBaseUnits / 1e18`. The API does not name a per-block reward, so it is derived
+  from `schedule`: `(firstPeriodRateBaseUnits + launchBonusBaseUnits / bonusBlocks) / 1e18` while
+  `closedThroughBlock < bonusBlocks`, then `firstPeriodRateBaseUnits / 1e18` until `halvingBlocks`.
+  Past that the page shows "Not reported" instead of guessing the halving. On 2026-11-05 this gave
+  about 3,674.57 SQK, which matches `issuedBaseUnits / closedThroughBlock`.
+- Several people on one device can play under different names ("Change name"). A guest who names
+  themselves keeps their pick, points and history under the new name; switching between two named
+  players keeps them apart. The leaderboard is per browser and says so on the page; static hosting
+  cannot share scores between visitors.
 
 ## Assumptions
 
-- The live API's response shape was not visible from this build machine (see Validation), so the
-  parser accepts the common shapes listed above rather than one exact schema.
+- The live API's response shapes were read on 2026-11-05 (see Validation) and the parsers target
+  them; the looser fallback shapes remain for other deployments.
 - The brief says both "the state changed in the predicted direction" scores and "correct
   predictions earn points". The game does both: a called flip earns 3 points and a called hold earns 1.
-- The share image is an SVG (`og-image.svg`). Some link unfurlers only accept PNG or JPEG; this
-  build machine could not render a raster file.
+- The share image is an SVG (`og-image.svg`). X and Facebook do not accept SVG for cards, so a
+  1200x630 PNG export of `src/og-image.svg` is still needed. This build machine had no working
+  shell or browser to rasterize it, and a binary file cannot be written by hand.
 
 ## Validation
 
-### What ran and what did not
+### Revision 2 (2026-11-05): what ran and what did not
+
+The shell was down again: every Bash call failed with `Sandbox is required but failed to
+initialize: Failed to create bridge sockets after 5 attempts.` The browser tool failed with
+`Chromium distribution 'chrome' is not found at /opt/google/chrome/chrome`.
+
+| Check | Result |
+| --- | --- |
+| Live API | **Ran** (WebFetch). `GET https://api.squeekchain.com/v1/status` returned `measurement.freshness=online`, `coreStatus=IDLE`, `rpmMilli=0` and `builder.anchor.blockHeight="366"`. `GET /v1/economy/state` returned `supply.liveSupplyBaseUnits=211344792874834038361435307` and the `schedule` fields used above. Both confirm the reviewer's report that the old parsers read neither payload. CORS headers could not be seen through this tool. |
+| `npm test` | **Not run.** New tests added for the real `/v1/status` shape (including the exact payload from the report, which must give `{state:'sleeping', rpm:0, height:366}`), stale and faulted measurements, the real economy shape (supply about 211,344,792.87, reward about 3,674.57, cross-checked against issued / blocks), the post-bonus and post-halving branches, and guest adoption. Traced by hand against `src/game.js`; a trace is not a test run. |
+| `npm run typecheck`, `npm run build` | **Not run.** `dist/` was rewritten by hand as an exact copy of the four changed `src/` files, which is all the build does. |
+| Design probe, browser at 320 / 390 / 1440 | **Not run.** Layout effects of the larger wheel and the moved result line were estimated from the CSS only: at 390 the pick buttons end about 640px down, inside an 844px first screen. |
+
+Changes in this revision: parsers for the live payloads, guest-to-name adoption
+(`adoptPlayer`), pick labels and lead copy that match early settling, a larger wheel, a colored
+title, static sleeping state, the result line moved under the wheel and kept in the layout,
+plainer in-play copy, and "Unavailable" for Block height when the feed fails. Still open: a PNG
+share image (see Assumptions).
+
+### Revision 1: what ran and what did not
 
 This build was made without a working shell. Every Bash call in the session failed before it
 started with `Sandbox is required but failed to initialize: Failed to create bridge sockets after
@@ -111,8 +140,18 @@ Findings fixed during the build:
 6. Low, `src/index.html:118`: "Make a pick above" was wrong on desktop, where the leaderboard sits beside the game. Changed to "Pick Squeek or Sleep to get on the board."
 7. Low, `src/styles.css:742` (`.history-list li`): widened the time column from 4.5rem to 5.5rem so 12-hour labels like "02:06 PM" fit.
 
-Remaining limitations: no build, typecheck, test, probe or browser run happened (see above); the
-live API's shape and CORS are unverified; the share image is SVG only; the leaderboard is
+Revision 2 review (source-only, same six domains). Findings and fixes:
+
+1. High (UI/states), `src/game.js:163` and `src/game.js:250`: neither parser read the live payloads, so every round voided and both chain stats said "Not reported". Both now read the real shapes, with tests in `tests/game.test.mjs`.
+2. Medium (writing), `src/index.html:89`, `src/index.html:93` and `src/index.html:29`: "Running at the end" and "when the next round ends" did not match early settling. The labels are now "Hamster runs" and "Hamster sleeps"; the lead and meta say "next round". The miss text no longer says "ended" for a flip (`src/app.js:331`).
+3. Medium (UI), `src/app.js:482`: a guest who named themselves lost their pick and split their points. Fixed with `adoptPlayer` (`src/game.js:366`).
+4. Medium (layout/typography), `src/styles.css:287` and `src/styles.css:155`: the wheel is now 9rem at 390 and 12rem on desktop. The title tracks at -0.04em, with Squeek and Sleep in their pick colors.
+5. Low (UI), `src/index.html:73` and `src/styles.css:633`: the result line now sits under the wheel and is always in the layout, with a reserved height. Its live announcement goes through `#result-announce`.
+6. Low (UI/motion), `src/styles.css:813`: the sleeping state is now static; the drift animation was removed.
+7. Low (writing/states), `src/app.js:275` and `src/app.js:216`: the in-play copy uses the rule's own words, and Block height says "Unavailable" once the feed has failed.
+
+Remaining limitations: no build, typecheck, test, probe or browser run happened (see above);
+CORS on the live API is unverified; the share image is SVG only; the leaderboard is
 per-browser by design.
 
 **Completion: Incomplete.** A complete, usable site and its export are delivered, but the

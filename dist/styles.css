@@ -155,8 +155,14 @@ a {
 .title {
   font-size: var(--text-display);
   font-weight: var(--weight-heavy);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.04em;
   line-height: 1.05;
+}
+
+/* The two picks, in their own colours: the title's signature on every platform. */
+.title .tag-run,
+.title .tag-sleep {
+  font-weight: inherit;
 }
 
 .header-link {
@@ -277,10 +283,18 @@ a {
   block-size: 7rem;
 }
 
-@media (min-width: 40rem) {
+/* 7rem only at the narrowest widths, where a larger wheel would squeeze the status text. */
+@media (min-width: 22rem) {
   .wheel {
     inline-size: 9rem;
     block-size: 9rem;
+  }
+}
+
+@media (min-width: 40rem) {
+  .wheel {
+    inline-size: 12rem;
+    block-size: 12rem;
   }
 }
 
@@ -612,19 +626,28 @@ a {
   display: none;
 }
 
-/* Settle result */
+/* Settle result. Always in the layout, right under the wheel: it describes the round in play
+   (data-kind="none") until a round settles, then shows the result until that round ends.
+   The minimum height holds three lines, so swapping text rarely moves the picks. */
 
 .result {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  margin-block-start: var(--space-4);
-  padding-block-start: var(--space-4);
-  border-block-start: 1px solid var(--color-border);
+  min-block-size: 5rem;
+  margin-block-end: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunken);
 }
 
-.result[data-kind="none"] {
+.result[data-kind="none"] .result-points {
   display: none;
+}
+
+.result[data-kind="none"] .result-text {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
 }
 
 .result-points {
@@ -648,13 +671,6 @@ a {
 }
 
 .result-text {
-  text-wrap: pretty;
-}
-
-.in-play {
-  margin-block-start: var(--space-3);
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
   text-wrap: pretty;
 }
 
@@ -801,9 +817,6 @@ a {
   .status[data-state="running"] .hamster {
     animation: trot 0.3s ease-in-out infinite alternate;
   }
-  .status[data-state="sleeping"] .zzz {
-    animation: drift 2.4s ease-in-out infinite alternate;
-  }
   .result[data-pop="true"] .result-points {
     animation: pop 600ms var(--ease-out) both;
   }
@@ -824,13 +837,6 @@ a {
 @keyframes trot {
   to {
     translate: 0 -1.5px;
-  }
-}
-
-@keyframes drift {
-  to {
-    translate: 2px -3px;
-    opacity: 0.6;
   }
 }
 

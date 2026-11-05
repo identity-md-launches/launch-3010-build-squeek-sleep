@@ -4,11 +4,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Squeek or Sleep: call the Squeekchain hamster</title>
-    <meta name="description" content="A free prediction game on Squeekchain. Guess whether Squeektoshi the hamster is running or asleep when the next 2-minute round ends, scored from live wheel telemetry." />
+    <meta name="description" content="A free prediction game on Squeekchain. Guess whether Squeektoshi the hamster is running or asleep next round, scored from live wheel telemetry." />
     <meta name="theme-color" content="#fff6ea" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Squeek or Sleep" />
-    <meta property="og:description" content="Guess whether Squeektoshi the hamster is running or asleep when the next round ends. Free, scored from live Squeekchain telemetry." />
+    <meta property="og:description" content="Guess whether Squeektoshi the hamster is running or asleep next round. Free, scored from live Squeekchain telemetry." />
     <meta property="og:image" content="./og-image.svg" />
     <meta property="og:image:alt" content="A hamster in a wheel beside the words Squeek or Sleep" />
     <meta name="twitter:card" content="summary_large_image" />
@@ -20,7 +20,7 @@
   </head>
   <body>
     <header class="site-header">
-      <h1 class="title">Squeek or Sleep</h1>
+      <h1 class="title"><span class="tag-run">Squeek</span> or <span class="tag-sleep">Sleep</span></h1>
       <a class="header-link" href="#rules">Rules</a>
     </header>
 
@@ -28,8 +28,8 @@
       <section class="card play" aria-labelledby="round-title">
         <p class="lead">
           Call whether Squeektoshi, the hamster powering
-          <a href="https://squeekchain.com" rel="noopener">Squeekchain</a>, is running or asleep
-          when the next 2-minute round ends. Free to play.
+          <a href="https://squeekchain.com" rel="noopener">Squeekchain</a>, runs or sleeps next
+          round. Free to play.
         </p>
 
         <div class="status" id="status" data-state="unknown">
@@ -70,6 +70,12 @@
         </div>
         <p class="visually-hidden" id="status-announce" role="status"></p>
 
+        <div class="result" id="result" data-kind="none">
+          <p class="result-points" id="result-points"></p>
+          <p class="result-text" id="result-text">Waiting for the first reading.</p>
+        </div>
+        <p class="visually-hidden" id="result-announce" role="status"></p>
+
         <div class="round">
           <div class="round-head">
             <h2 class="round-title" id="round-title">Pick for the <span id="next-label">next</span> round</h2>
@@ -80,11 +86,11 @@
           <div class="picks" role="group" aria-labelledby="round-title">
             <button type="button" class="pick pick-run" data-pick="run" aria-pressed="false" aria-describedby="pick-state">
               <span class="pick-label">Squeek</span>
-              <span class="pick-hint" data-hint="Running at the end">Running at the end</span>
+              <span class="pick-hint" data-hint="Hamster runs">Hamster runs</span>
             </button>
             <button type="button" class="pick pick-sleep" data-pick="sleep" aria-pressed="false" aria-describedby="pick-state">
               <span class="pick-label">Sleep</span>
-              <span class="pick-hint" data-hint="Asleep at the end">Asleep at the end</span>
+              <span class="pick-hint" data-hint="Hamster sleeps">Hamster sleeps</span>
             </button>
           </div>
           <p class="pick-state" id="pick-state" role="status">No pick yet. You can change it until the countdown ends.</p>
@@ -102,13 +108,6 @@
             <p class="field-error" id="name-error"></p>
           </form>
         </div>
-
-        <div class="result" id="result" data-kind="none" role="status">
-          <p class="result-points" id="result-points"></p>
-          <p class="result-text" id="result-text"></p>
-        </div>
-
-        <p class="in-play" id="in-play">Waiting for the first reading.</p>
       </section>
 
       <aside class="side">

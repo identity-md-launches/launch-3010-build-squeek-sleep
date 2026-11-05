@@ -6,6 +6,7 @@ import {
   POINTS_FLIP,
   POINTS_HELD,
   ROUND_MS,
+  adoptPlayer,
   advance,
   emptySave,
   formatCountdown,
@@ -38,6 +39,86 @@ test("parseStatus refuses payloads without a wheel state", () => {
   assert.equal(parseStatus({ status: "ok" }, 1), null);
   assert.equal(parseStatus(null, 1), null);
   assert.equal(parseStatus("running", 1), null);
+});
+
+// Trimmed from GET https://api.squeekchain.com/v1/status, 2026-11-05.
+const liveStatus = (/** @type {Record<string, unknown>} */ measurement) => ({
+  schemaVersion: 1,
+  measurement: { freshness: "online", coreStatus: "IDLE", rpmMilli: 0, speedMmPerSecond: 0, ...measurement },
+  builder: { status: "available", anchor: { blockHeight: "366", blockProgress: "425653103" } },
+  oracle: { state: "accepted" },
+  settlementQueue: { status: "available", state: "empty" },
+  modules: [{ instanceId: "wheel", state: "ready", data: {} }],
+});
+
+test("parseStatus reads the live Squeekchain measurement shape", () => {
+  assert.deepEqual(
+    parseStatus(
+      {
+        measurement: { freshness: "online", coreStatus: "IDLE", rpmMilli: 0 },
+        builder: { status: "available", anchor: { blockHeight: 366 } },
+        oracle: { state: "accepted" },
+        settlementQueue: { status: "available", state: "empty" },
+      },
+      7,
+    ),
+    { state: "sleeping", rpm: 0, height: 366, at: 7 },
+  );
+  assert.deepEqual(parseStatus(liveStatus({}), 1), { state: "sleeping", rpm: 0, height: 366, at: 1 }, "string block height");
+  assert.deepEqual(parseStatus(liveStatus({ coreStatus: "ACTIVE", rpmMilli: 84500 }), 1), { state: "running", rpm: 84.5, height: 366, at: 1 });
+  assert.equal(parseStatus(liveStatus({ coreStatus: "SPINNING", rpmMilli: "120000" }), 1)?.state, "running");
+});
+
+test("parseStatus treats a stale or faulted measurement as no reading", () => {
+  assert.equal(parseStatus(liveStatus({ freshness: "stale" }), 1), null);
+  assert.equal(parseStatus(liveStatus({ freshness: "offline", coreStatus: "ACTIVE", rpmMilli: 90000 }), 1), null);
+  assert.equal(parseStatus(liveStatus({ coreStatus: "COUNTER_FAULT" }), 1), null, "no RPM fallback for a fault");
+});
+
+test("parseEconomy reads the live Squeekchain supply and schedule", () => {
+  // Values from GET https://api.squeekchain.com/v1/economy/state, 2026-11-05.
+  const live = {
+    supply: { liveSupplyBaseUnits: "211344792874834038361435307", totalMintedBaseUnits: "211344892876204030802856319" },
+    schedule: {
+      firstPeriodRateBaseUnits: "2592319617759930871476",
+      launchBonusBaseUnits: "105000000000000000000000000",
+      bonusBlocks: 97020,
+      halvingBlocks: 393470,
+      startHeight: 0,
+      closedThroughBlock: 366,
+      issuedBaseUnits: "1344892876204030802856319",
+    },
+  };
+  const econ = parseEconomy(live);
+  assert.ok(econ.supply !== null && Math.abs(econ.supply - 211_344_792.87) < 0.01, `supply ${econ.supply}`);
+  assert.ok(econ.reward !== null && Math.abs(econ.reward - 3674.57) < 0.01, `reward ${econ.reward}`);
+  // Cross-check: issued so far divided by blocks closed is the same per-block reward.
+  assert.ok(Math.abs(econ.reward - 1344892.876204 / 366) < 0.01);
+
+  const afterBonus = parseEconomy({ ...live, schedule: { ...live.schedule, closedThroughBlock: 200000 } });
+  assert.ok(afterBonus.reward !== null && Math.abs(afterBonus.reward - 2592.32) < 0.01, `after bonus ${afterBonus.reward}`);
+  const pastHalving = parseEconomy({ ...live, schedule: { ...live.schedule, closedThroughBlock: 400000 } });
+  assert.equal(pastHalving.reward, null, "no guess past the first halving");
+  assert.equal(parseEconomy({ supply: {}, schedule: {} }).supply, null);
+});
+
+test("adoptPlayer hands a guest's pick, stats and results to their new name", () => {
+  const save = emptySave();
+  placePick(save, "Guest", "run", roundStart(R) + 10_000);
+  advance(save, obs("sleeping", roundStart(R + 1) + 1000), roundStart(R + 1) + 1000);
+  advance(save, obs("running", roundStart(R + 1) + 20_000), roundStart(R + 1) + 20_000);
+  placePick(save, "Guest", "sleep", roundStart(R + 1) + 30_000);
+  assert.equal(adoptPlayer(save, "Guest", "Ana"), true);
+  assert.equal(pickFor(save, R + 2, "Ana"), "sleep");
+  assert.equal(pickFor(save, R + 2, "Guest"), null);
+  assert.equal(save.players.Ana.points, POINTS_FLIP);
+  assert.equal(save.players.Guest, undefined);
+  assert.equal(save.rounds[String(R + 1)].results.Ana.points, POINTS_FLIP);
+  assert.deepEqual(leaderboard(save).map((p) => p.name), ["Ana"]);
+  // An existing name is another player: nothing moves.
+  placePick(save, "Guest", "run", roundStart(R + 1) + 40_000);
+  assert.equal(adoptPlayer(save, "Guest", "Ana"), false);
+  assert.equal(pickFor(save, R + 2, "Guest"), "run");
 });
 
 test("parseEconomy finds supply and reward", () => {

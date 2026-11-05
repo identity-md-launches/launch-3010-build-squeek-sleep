@@ -8,11 +8,12 @@ Extracted from the final source: `src/styles.css` (tokens and components), `src/
 A one-page, free prediction game for anyone curious about Squeekchain. The look is warm and
 playful: cream paper, brown ink, an orange that means "running" and an indigo that means
 "asleep". One illustration carries the idea: a hamster wheel drawn in inline SVG that spins
-while the hamster runs and goes still, eyes closed, with drifting "z" marks while it sleeps.
+while the hamster runs and goes fully still, eyes closed, with two static "z" marks while it
+sleeps. Nothing moves in the sleeping state.
 
 Hierarchy is set by size and weight, not decoration. The game card comes first and holds,
-top to bottom: one plain sentence saying what this is, the live wheel status, the countdown
-and the two pick buttons. Supporting panels (leaderboard, chain stats, history, rules) are
+top to bottom: one plain sentence saying what this is, the live wheel status, the result line
+(the round in play, or the latest settle result), the countdown and the two pick buttons. Supporting panels (leaderboard, chain stats, history, rules) are
 flat cards that follow it. Density is relaxed, with 44px minimum targets.
 
 ## Colors
@@ -24,13 +25,13 @@ components use only the semantic roles.
 | --- | --- | --- | --- |
 | `--color-bg` | `--cream-50` | `#fff6ea` | Page background |
 | `--color-surface` | `--cream-0` | `#fffdf8` | Cards, quiet buttons, input background |
-| `--color-surface-sunken` | `--cream-100` | `#fbead3` | Progress track, wheel fill, list dividers, quiet-button hover |
+| `--color-surface-sunken` | `--cream-100` | `#fbead3` | Progress track, wheel fill, result line background, list dividers, quiet-button hover |
 | `--color-text` | `--brown-900` | `#3a2414` | Body text, headings |
 | `--color-text-muted` | `--brown-700` | `#6e4f36` | Lead line, notes, metadata, input border |
 | `--color-border` | `--brown-300` | `#e3c7a3` | Card borders, section dividers, quiet-button border |
-| `--color-run` | `--orange-700` | `#c2410c` | Squeek button fill, "running" text, progress fill, your leaderboard row |
+| `--color-run` | `--orange-700` | `#c2410c` | Squeek button fill, "Squeek" in the title, "running" text, progress fill, your leaderboard row |
 | `--color-run-hover` | `--orange-800` | `#9a3412` | Squeek button hover |
-| `--color-sleep` | `--indigo-700` | `#3b3f8c` | Sleep button fill, "asleep" text, the "z" marks |
+| `--color-sleep` | `--indigo-700` | `#3b3f8c` | Sleep button fill, "Sleep" in the title, "asleep" text, the "z" marks |
 | `--color-sleep-hover` | `--indigo-800` | `#2e3170` | Sleep button hover |
 | `--color-success` | `--green-700` | `#1f6f3a` | Points won (result, history) |
 | `--color-danger` | `--crimson-700` | `#a3123a` | Name field error text and border |
@@ -52,8 +53,8 @@ validation section); they were not measured in a rendered browser.
 | `--text-display` | 2rem, 2.75rem from 40rem wide | `h1.title`, the largest and heaviest type on the page |
 | `--text-xl` | 1.75rem | Status word, countdown, pick button labels, result points |
 | `--text-lg` | 1.25rem | Section `h2`s, round title |
-| `--text-md` | 1rem | Body, lead line, buttons, input (16px avoids iOS zoom) |
-| `--text-sm` | 0.875rem | Notes, metadata, pick hints, history sub-lines |
+| `--text-md` | 1rem | Body, lead line, settle result text, buttons, input (16px avoids iOS zoom) |
+| `--text-sm` | 0.875rem | Notes, metadata, pick hints, the in-play line, history sub-lines |
 
 Five sizes at any width. Weights: `--weight-regular` 400, `--weight-semibold` 600,
 `--weight-heavy` 800.
@@ -63,10 +64,16 @@ Families, both system stacks with no web font files:
 - `--font-display`: `ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", "Nunito", "Varela Round", system-ui, sans-serif`.
   Used for `h1`, `h2`, the countdown, pick labels, result points and leaderboard points. The rounded
   face renders on Apple platforms; elsewhere it falls back to the system sans, which was not verified in a browser.
+  No font file is bundled; a bundled rounded face is the requester's call.
 - `--font-body`: `system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`.
 
+Signature detail on every platform: the title is `<span class="tag-run">Squeek</span> or
+<span class="tag-sleep">Sleep</span>`, so the two picks carry their colors (orange, indigo) at
+the heavy 800 weight (`.title .tag-run, .title .tag-sleep { font-weight: inherit }`), while
+"or" stays in the text color.
+
 Rules: headings `line-height: 1.15` and `text-wrap: balance`; body `1.5`; the h1 tracks at
-`-0.02em` and the status word at `-0.01em`; nothing is tracked wider or set in capitals.
+`-0.04em` and the status word at `-0.01em`; nothing is tracked wider or set in capitals.
 Every changing number (countdown, RPM, block, points, times) uses
 `font-variant-numeric: tabular-nums`. Prose is capped at 60 to 65ch and uses `text-wrap: pretty`.
 
@@ -79,10 +86,13 @@ Every changing number (countdown, RPM, block, points, times) uses
 - `.layout` is a CSS grid with named areas. Below 60rem it is one column, ordered play, side
   (leaderboard and chain stats), history, rules. From 60rem it becomes `minmax(0, 1fr) 21rem`
   with the side column sticky at the top (`inset-block-start: var(--space-4)`).
-- Inside the play card: the wheel (7rem, 9rem from 40rem) sits beside the status text; the pick
-  buttons are a two-column grid at every width.
+- Inside the play card: the wheel sits beside the status text. It is 7rem below 22rem wide
+  (so the text column keeps room at 320px), 9rem from 22rem (144px at 390), and 12rem from 40rem.
+  The result line follows the status at a fixed place, then the round block. The pick buttons are
+  a two-column grid at every width.
 - Logical properties throughout (`margin-inline`, `padding-block-start`, `inset-block-start`).
-- Breakpoints: 40rem (larger margins, display size, wheel, card padding) and 60rem (two columns).
+- Breakpoints: 22rem (wheel 9rem), 40rem (larger margins, display size, wheel 12rem, card
+  padding) and 60rem (two columns).
   The intended result is no horizontal scroll at 320px; this was reasoned from the source, not observed in a browser.
 
 ## Elevation and depth
@@ -106,10 +116,12 @@ All patterns live in `src/index.html` with styles in `src/styles.css` and behavi
   The first `h2` gets `margin-block-end: var(--space-3)`.
 - **Wheel status** (`.status[data-state]`, `svg.wheel`): `data-state` is `running`, `sleeping` or
   `unknown`. Running spins `.wheel-spin` with `--spin-duration` set from the RPM (0.4s to 3s per turn)
-  and bobs the hamster; sleeping closes the eye and shows `.zzz`; unknown greys the strokes.
+  and bobs the hamster; sleeping closes the eye and shows the static `.zzz` marks, with no
+  animation at all; unknown greys the strokes.
   The heading reads "Squeektoshi is / running" or "Wheel status / loading" or "offline".
   Motion runs only under `prefers-reduced-motion: no-preference`.
-- **Pick button** (`button.pick.pick-run`, `button.pick.pick-sleep`): filled, white text, label plus hint.
+- **Pick button** (`button.pick.pick-run`, `button.pick.pick-sleep`): filled, white text, label
+  plus hint ("Hamster runs", "Hamster sleeps").
   `aria-pressed="true"` adds the double ring and changes the hint to "Your pick". Hover darkens
   (only with `hover: hover`); press scales to 0.96. Transitions name `background-color, box-shadow, scale`.
 - **Quiet button** (`.button-quiet`): bordered surface button, 44px tall, used for "Change name",
@@ -117,8 +129,16 @@ All patterns live in `src/index.html` with styles in `src/styles.css` and behavi
 - **Name form** (`#name-form`): visible label, 16px input, `aria-invalid` plus `#name-error`
   described by the input; Escape closes it and returns focus to "Change name".
 - **Countdown and progress** (`.round-head`, `.countdown`, `.progress`): `m:ss` countdown, with a bar that fills over the 2-minute round.
-- **Result** (`#result[data-kind]`): `win`, `miss`, `void`, `info` or `none` (hidden). A one-shot
-  pop animation (scale 0.25 to 1, blur 4px to 0) plays when `data-pop="true"`. It is a polite live region.
+- **Result line** (`#result[data-kind]`): always in the layout, directly under the wheel status, on
+  `--color-surface-sunken` with `--radius-md`, padding `--space-3` `--space-4` and
+  `min-block-size: 5rem` (about three lines), so swapping its text rarely moves the picks.
+  With `data-kind="none"` it hides the points badge and shows the round in play in
+  `--text-sm` muted text ("In play: the 7:26 PM round started with Squeektoshi asleep. Your pick:
+  Squeek."). When a round settles it becomes `win`, `miss`, `void` or `info`, shows the points
+  badge (`--text-xl`) and the result in `--text-md`, and plays a one-shot pop (scale 0.25 to 1,
+  blur 4px to 0) via `data-pop="true"`. The result stays until the round it landed in ends, then
+  the line returns to the round in play. Results are announced through the visually hidden
+  `#result-announce` polite live region, so the in-play text is not read out every round.
 - **Leaderboard row** (`.board-list li`): rank, name with "x of y right", points. Your row is orange
   and says "(you)".
 - **History row** (`.history-list li`): local start time, "Running to asleep (flip)" with colored
@@ -126,8 +146,8 @@ All patterns live in `src/index.html` with styles in `src/styles.css` and behavi
 - **Stats list** (`dl.stats`): label left, tabular value right.
 
 States implemented: loading ("Wheel status loading", "Loading"), feed error ("offline", "Unable to
-reach Squeekchain. Retrying every 5 seconds."), unreadable payload, empty leaderboard and history,
-storage blocked, void rounds.
+reach Squeekchain. Retrying every 5 seconds."; chain stats and Block height read "Unavailable"),
+unreadable or stale measurement, empty leaderboard and history, storage blocked, void rounds.
 
 ## Do's and don'ts
 

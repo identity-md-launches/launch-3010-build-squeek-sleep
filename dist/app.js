@@ -2,6 +2,7 @@
 import {
   POLL_MS,
   ROUND_MS,
+  adoptPlayer,
   advance,
   cleanName,
   emptySave,
@@ -60,7 +61,7 @@ const el = {
   result: byId("result"),
   resultPoints: byId("result-points"),
   resultText: byId("result-text"),
-  inPlay: byId("in-play"),
+  resultAnnounce: byId("result-announce"),
   boardList: byId("board-list"),
   boardEmpty: byId("board-empty"),
   historyList: byId("history-list"),
@@ -211,6 +212,8 @@ function renderStatus(now) {
     el.econHeight.textContent = latest.height === null ? "Not reported" : numberFormat.format(latest.height);
     const rpm = latest.rpm && latest.rpm > 0 ? latest.rpm : 40;
     el.status.style.setProperty("--spin-duration", `${Math.min(3, Math.max(0.4, 60 / rpm)).toFixed(2)}s`);
+  } else {
+    el.econHeight.textContent = feed === "connecting" ? "Loading" : "Unavailable";
   }
 
   if (feed === "connecting") {
@@ -269,15 +272,26 @@ function renderRound(now) {
   let inPlay;
   if (!current || current.start === null) {
     inPlay = now - roundStart(currentId) > 15_000
-      ? `The ${roundLabel(currentId)} round started before this page had a reading, so it is not scored.${yours}`
+      ? `No reading at the start of the ${roundLabel(currentId)} round, so it is not scored.${yours}`
       : `The ${roundLabel(currentId)} round is starting.${yours}`;
   } else if (current.settled) {
     inPlay = `The ${roundLabel(currentId)} round already settled: the wheel changed state.`;
   } else {
     inPlay = `In play: the ${roundLabel(currentId)} round started with Squeektoshi ${stateWord(current.start)}.${yours}`;
   }
-  if (el.inPlay.textContent !== inPlay) el.inPlay.textContent = inPlay;
+
+  // The result block holds the latest settle result until the round it landed in ends, then
+  // goes back to describing the round in play. It never leaves the layout.
+  if (el.result.dataset.kind !== "none" && resultShownIn !== currentId) {
+    el.result.dataset.kind = "none";
+    el.result.dataset.pop = "false";
+    el.resultPoints.textContent = "";
+  }
+  if (el.result.dataset.kind === "none" && el.resultText.textContent !== inPlay) el.resultText.textContent = inPlay;
 }
+
+/** Round id that was in play when the result on screen was shown. */
+let resultShownIn = -1;
 
 /** @param {Round} round */
 function describeRound(round) {
@@ -314,15 +328,19 @@ function showResult(settled) {
   } else if (mine) {
     kind = "miss";
     points = "0";
-    text = `Not this time. Squeektoshi ended ${stateWord(round.end)}. Nothing lost; pick again.`;
+    text = round.outcome === "flipped"
+      ? `Not this time. Squeektoshi went from ${stateWord(round.start)} to ${stateWord(round.end)}. Nothing lost; pick again.`
+      : `Not this time. Squeektoshi stayed ${stateWord(round.end)}. Nothing lost; pick again.`;
   } else {
     if (round.start === null) return;
     points = round.outcome === "flipped" ? "Flip" : "Held";
     text = `${label} settled: ${describeRound(round).toLowerCase()}. Pick Squeek or Sleep to score the next one.`;
   }
+  resultShownIn = roundIdAt(Date.now());
   el.result.dataset.kind = kind;
   el.resultPoints.textContent = points;
   el.resultText.textContent = text;
+  el.resultAnnounce.textContent = points && /^[+\d]/.test(points) ? `${points} points. ${text}` : text;
   // Restart the one-shot pop animation.
   el.result.dataset.pop = "false";
   void el.result.offsetWidth;
@@ -459,6 +477,9 @@ el.nameForm.addEventListener("submit", (event) => {
     el.nameInput.focus();
     return;
   }
+  // A guest naming themselves keeps their pick and points. Switching between two real
+  // names keeps them apart, so several people can share one device.
+  if (save.current === DEFAULT_NAME && name !== DEFAULT_NAME) adoptPlayer(save, DEFAULT_NAME, name);
   save.current = name;
   persist();
   el.nameForm.hidden = true;

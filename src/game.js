@@ -162,14 +162,27 @@ const HEIGHT_KEYS = ["blockheight", "height", "latestblock", "currentblock", "bl
  */
 export function parseStatus(payload, at) {
   if (!payload || typeof payload !== "object") return null;
-  const rpm = toNumber(findValue(payload, RPM_KEYS));
+  const obj = /** @type {Record<string, unknown>} */ (payload);
   const height = toNumber(findValue(payload, HEIGHT_KEYS));
 
+  // The live Squeekchain shape: the wheel reading sits in `measurement`, with the state in
+  // `coreStatus` (ACTIVE / IDLE / COUNTER_FAULT ...) and the speed in thousandths of an RPM.
+  // A reading that is not fresh, or a status that is neither running nor idle, is no reading.
+  const measurement = obj.measurement;
+  if (measurement && typeof measurement === "object" && !Array.isArray(measurement)) {
+    const m = /** @type {Record<string, unknown>} */ (measurement);
+    if (m.freshness !== undefined && m.freshness !== "online") return null;
+    const measured = toHamsterState(m.coreStatus);
+    if (!measured) return null;
+    const milli = toNumber(m.rpmMilli);
+    return { state: measured, rpm: milli === null ? null : milli / 1000, height, at };
+  }
+
+  const rpm = toNumber(findValue(payload, RPM_KEYS));
   /** @type {HamsterState | null} */
   let state = null;
   // A `wheel` object usually carries the state, so look there before the top-level `status`,
   // which some APIs use for request health ("ok").
-  const obj = /** @type {Record<string, unknown>} */ (payload);
   for (const scope of [obj.wheel, obj.hamster, obj.data, obj]) {
     if (state || !scope || typeof scope !== "object") continue;
     for (const key of STATE_KEYS) {
@@ -195,11 +208,53 @@ export function parseStatus(payload, at) {
  * @property {number | null} reward
  */
 
+/** SQK has 18 decimals; the API reports amounts in base units as decimal strings. */
+const SQK_DECIMALS = 18;
+
+/**
+ * Convert a base-unit amount (string or number) to whole SQK, or null.
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+export function fromBaseUnits(value) {
+  const n = toNumber(value);
+  return n === null ? null : n / 10 ** SQK_DECIMALS;
+}
+
+/**
+ * Reward for the next block from the emission schedule. During the first `bonusBlocks`
+ * blocks the launch bonus is spread evenly on top of the first-period rate; after that the
+ * first-period rate holds until `halvingBlocks`. Past that the API does not say what the
+ * rate becomes, so this returns null instead of guessing.
+ * @param {Record<string, unknown>} schedule
+ * @returns {number | null}
+ */
+export function scheduleReward(schedule) {
+  const rate = toNumber(schedule.firstPeriodRateBaseUnits);
+  const closed = toNumber(schedule.closedThroughBlock);
+  if (rate === null || closed === null) return null;
+  const block = closed - (toNumber(schedule.startHeight) ?? 0);
+  const bonus = toNumber(schedule.launchBonusBaseUnits) ?? 0;
+  const bonusBlocks = toNumber(schedule.bonusBlocks) ?? 0;
+  const halvingBlocks = toNumber(schedule.halvingBlocks);
+  let reward = rate;
+  if (bonusBlocks > 0 && block < bonusBlocks) reward += bonus / bonusBlocks;
+  else if (halvingBlocks !== null && block >= halvingBlocks) return null;
+  return reward / 10 ** SQK_DECIMALS;
+}
+
 /**
  * @param {unknown} payload
  * @returns {Economy}
  */
 export function parseEconomy(payload) {
+  const obj = payload && typeof payload === "object" ? /** @type {Record<string, any>} */ (payload) : {};
+  // The live Squeekchain shape: `supply` and `schedule` objects with amounts in base units.
+  if (obj.supply && typeof obj.supply === "object") {
+    const supply = fromBaseUnits(obj.supply.liveSupplyBaseUnits ?? obj.supply.totalMintedBaseUnits);
+    const reward = obj.schedule && typeof obj.schedule === "object" ? scheduleReward(obj.schedule) : null;
+    return { supply, reward };
+  }
   return {
     supply: toNumber(findValue(payload, ["circulatingsupply", "totalsupply", "sqksupply", "supply", "minted", "totalminted"])),
     reward: toNumber(findValue(payload, ["blockreward", "currentblockreward", "rewardperblock", "reward", "blocksubsidy", "subsidy"])),
@@ -297,6 +352,40 @@ export function placePick(save, player, pick, now) {
   save.picks[key][player] = pick;
   if (!save.players[player]) save.players[player] = { points: 0, correct: 0, played: 0 };
   return target;
+}
+
+/**
+ * Hand everything recorded under `from` (stats, open picks, round results) to `to`.
+ * Used when a guest names themselves, so one person's points do not split across two
+ * rows. Does nothing if `to` already has a record: that is a different player.
+ * @param {SaveData} save
+ * @param {string} from
+ * @param {string} to
+ * @returns {boolean} whether anything moved
+ */
+export function adoptPlayer(save, from, to) {
+  if (from === to || save.players[to]) return false;
+  let moved = false;
+  if (save.players[from]) {
+    save.players[to] = save.players[from];
+    delete save.players[from];
+    moved = true;
+  }
+  for (const picks of Object.values(save.picks)) {
+    if (picks && from in picks) {
+      picks[to] = picks[from];
+      delete picks[from];
+      moved = true;
+    }
+  }
+  for (const round of Object.values(save.rounds)) {
+    if (round && round.results && from in round.results) {
+      round.results[to] = round.results[from];
+      delete round.results[from];
+      moved = true;
+    }
+  }
+  return moved;
 }
 
 /**
