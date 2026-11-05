@@ -1,0 +1,17 @@
+{
+  "name": "squeek-or-sleep",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Squeek or Sleep: a free prediction game on Squeekchain telemetry. Vanilla HTML, CSS and JavaScript with no runtime dependencies.",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "preview": "node scripts/preview.mjs",
+    "test": "node --test tests/",
+    "typecheck": "npx --yes --package typescript@5.9 tsc -p tsconfig.json",
+    "check": "npm run typecheck && npm test && npm run build"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Squeek or Sleep: call the Squeekchain hamster</title>
+    <meta name="description" content="A free prediction game on Squeekchain. Guess whether Squeektoshi the hamster is running or asleep when the next 2-minute round ends, scored from live wheel telemetry." />
+    <meta name="theme-color" content="#fff6ea" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Squeek or Sleep" />
+    <meta property="og:description" content="Guess whether Squeektoshi the hamster is running or asleep when the next round ends. Free, scored from live Squeekchain telemetry." />
+    <meta property="og:image" content="./og-image.svg" />
+    <meta property="og:image:alt" content="A hamster in a wheel beside the words Squeek or Sleep" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Squeek or Sleep" />
+    <meta name="twitter:image" content="./og-image.svg" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./app.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <h1 class="title">Squeek or Sleep</h1>
+      <a class="header-link" href="#rules">Rules</a>
+    </header>
+
+    <main class="layout">
+      <section class="card play" aria-labelledby="round-title">
+        <p class="lead">
+          Call whether Squeektoshi, the hamster powering
+          <a href="https://squeekchain.com" rel="noopener">Squeekchain</a>, is running or asleep
+          when the next 2-minute round ends. Free to play.
+        </p>
+
+        <div class="status" id="status" data-state="unknown">
+          <svg class="wheel" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+            <path class="wheel-stand" d="M60 60 L32 116 M60 60 L88 116 M24 116 H96" />
+            <g class="wheel-spin">
+              <circle class="wheel-rim" cx="60" cy="60" r="50" />
+              <circle class="wheel-rungs" cx="60" cy="60" r="45" />
+              <path class="wheel-spokes" d="M60 12 V108 M12 60 H108 M26 26 L94 94 M94 26 L26 94" />
+            </g>
+            <circle class="wheel-hub" cx="60" cy="60" r="6" />
+            <g class="hamster">
+              <ellipse class="hamster-body" cx="58" cy="94" rx="19" ry="12" />
+              <ellipse class="hamster-belly" cx="56" cy="98" rx="11" ry="6" />
+              <circle class="hamster-body" cx="74" cy="88" r="10" />
+              <circle class="hamster-ear" cx="71" cy="79" r="4" />
+              <circle class="hamster-nose" cx="83.5" cy="89" r="1.8" />
+              <circle class="hamster-eye-open" cx="78" cy="86" r="1.8" />
+              <path class="hamster-eye-closed" d="M75.5 86.5 Q78 88.5 80.5 86.5" />
+            </g>
+            <g class="zzz">
+              <text x="84" y="44">z</text>
+              <text x="93" y="32">z</text>
+            </g>
+          </svg>
+          <div class="status-text">
+            <h2 class="status-heading">
+              <span class="status-who" id="status-who">Wheel status</span>
+              <span class="status-word" id="status-word">loading</span>
+            </h2>
+            <p class="status-meta">
+              <span id="status-rpm">RPM unknown</span>
+              <span aria-hidden="true">·</span>
+              <span id="status-height">Block unknown</span>
+            </p>
+            <p class="status-fresh" id="status-fresh">Connecting to Squeekchain</p>
+          </div>
+        </div>
+        <p class="visually-hidden" id="status-announce" role="status"></p>
+
+        <div class="round">
+          <div class="round-head">
+            <h2 class="round-title" id="round-title">Pick for the <span id="next-label">next</span> round</h2>
+            <p class="countdown"><span id="countdown">2:00</span> left</p>
+          </div>
+          <div class="progress" aria-hidden="true"><span class="progress-fill" id="progress-fill"></span></div>
+
+          <div class="picks" role="group" aria-labelledby="round-title">
+            <button type="button" class="pick pick-run" data-pick="run" aria-pressed="false" aria-describedby="pick-state">
+              <span class="pick-label">Squeek</span>
+              <span class="pick-hint" data-hint="Running at the end">Running at the end</span>
+            </button>
+            <button type="button" class="pick pick-sleep" data-pick="sleep" aria-pressed="false" aria-describedby="pick-state">
+              <span class="pick-label">Sleep</span>
+              <span class="pick-hint" data-hint="Asleep at the end">Asleep at the end</span>
+            </button>
+          </div>
+          <p class="pick-state" id="pick-state" role="status">No pick yet. You can change it until the countdown ends.</p>
+
+          <div class="player" id="player-row">
+            <p class="player-name">Playing as <strong id="player-name">Guest</strong></p>
+            <button type="button" class="button-quiet" id="change-name" aria-expanded="false" aria-controls="name-form">Change name</button>
+          </div>
+          <form class="name-form" id="name-form" hidden novalidate>
+            <label for="name-input">Your name on the leaderboard</label>
+            <div class="name-row">
+              <input id="name-input" name="nickname" type="text" maxlength="20" autocomplete="nickname" spellcheck="false" aria-describedby="name-error" />
+              <button type="submit" class="button-quiet">Save name</button>
+            </div>
+            <p class="field-error" id="name-error"></p>
+          </form>
+        </div>
+
+        <div class="result" id="result" data-kind="none" role="status">
+          <p class="result-points" id="result-points"></p>
+          <p class="result-text" id="result-text"></p>
+        </div>
+
+        <p class="in-play" id="in-play">Waiting for the first reading.</p>
+      </section>
+
+      <aside class="side">
+        <section class="card board" aria-labelledby="board-title">
+          <h2 id="board-title">Leaderboard</h2>
+          <ol class="board-list" id="board-list"></ol>
+          <p class="empty" id="board-empty">No points yet. Pick Squeek or Sleep to get on the board.</p>
+          <p class="note">Scores live in this browser only. Everyone who plays on this device shares this board.</p>
+        </section>
+
+        <section class="card economy" aria-labelledby="economy-title">
+          <h2 id="economy-title">Squeekchain now</h2>
+          <dl class="stats">
+            <div><dt>SQK supply</dt><dd id="econ-supply">Loading</dd></div>
+            <div><dt>Block reward</dt><dd id="econ-reward">Loading</dd></div>
+            <div><dt>Block height</dt><dd id="econ-height">Loading</dd></div>
+          </dl>
+          <p class="note" id="econ-note">From api.squeekchain.com, refreshed every minute.</p>
+        </section>
+      </aside>
+
+      <section class="card history" aria-labelledby="history-title">
+        <h2 id="history-title">Last 10 rounds</h2>
+        <ol class="history-list" id="history-list"></ol>
+        <p class="empty" id="history-empty">No rounds settled yet. Keep this page open and the first result lands within 4 minutes.</p>
+      </section>
+
+      <section class="card rules" id="rules" aria-labelledby="rules-title">
+        <h2 id="rules-title">How scoring works</h2>
+        <ul class="rules-list">
+          <li>Rounds are 2-minute windows on the clock. Pick Squeek or Sleep while the countdown runs; your pick counts for the round that starts when it hits zero.</li>
+          <li>When that round starts, this page records whether the wheel is running or stopped. It settles after 2 minutes, or as soon as the wheel changes state.</li>
+          <li>Call a change correctly (asleep to running, or running to asleep) for 3 points. Call no change correctly for 1 point. A wrong pick costs nothing.</li>
+          <li>Rounds are read in your browser, so keep the page open. A round with no reading at its start or end is not scored.</li>
+        </ul>
+        <button type="button" class="button-quiet button-reset" id="reset">Clear scores on this device</button>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>
+        Squeek or Sleep reads live wheel telemetry from the public Squeekchain API every 5 seconds.
+        No tokens, no wallet, no sign-up.
+        <a href="https://squeekchain.com" rel="noopener">Visit squeekchain.com</a>
+      </p>
+    </footer>
+  </body>
+</html>
